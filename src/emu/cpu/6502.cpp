@@ -52,7 +52,6 @@ void op_PHA_0x48(CPU6502 &cpu) {
 void op_JMP_0x4C(CPU6502 &cpu) {
     uint16_t addr = cpu.read16();
     cpu.pc = addr;
-    printf("JMP to %04X!\n", addr);
 }
 
 void op_RTS_0x60(CPU6502 &cpu) {
@@ -76,6 +75,7 @@ void op_ADC_0x69(CPU6502 &cpu) {
     uint8_t value = cpu.read(cpu.pc++);
     cpu.regs.ac += value;
     cpu.set_zn(cpu.regs.ac);
+    cpu.reg_dump();
 }
 
 void op_STY_0x84(CPU6502 &cpu) {
@@ -221,21 +221,16 @@ void CPU6502::reset() {
     for (int i = 0; i < sizeof(memory); i++)
         memory[i] = 0xEA;
 
-    static const uint8_t demo_bin[] = {
-        0xA2, 0x0A,        // LDX #$0A
-        0xCA,              // DEX
-        0xD0, 0xFD,        // BNE $8002
-        0x4C, 0x05, 0x80   // JMP $8005 (infinite loop)
+    static const unsigned char imm_arith_bin[] = {
+      0xa9, 0x10, 0x69, 0x05, 0x4c, 0x00, 0x80, 0x00, 0x80
     };
-    memcpy(&memory[0x8000], demo_bin, sizeof(demo_bin));
+    memcpy(&memory[0x8000], imm_arith_bin, sizeof(imm_arith_bin));
 
     memory[0xFFFC] = 0x00;
     memory[0xFFFD] = 0x80;
 
     // Read reset vector
     pc = memory[0xFFFC] | (memory[0xFFFD] << 8);
-
-    printf("PC: %04X\n", pc);
 
     cycles_remaining = 0;
 }
@@ -244,7 +239,7 @@ void CPU6502::reset() {
 void CPU6502::clock() {
     if (cycles_remaining == 0) {
         uint8_t opcode = read(pc++);
-        printf("Opcode: %02X, current address: %04X\n", opcode, pc - 1);
+        // printf("Opcode: %02X, current address: %04X\n", opcode, pc - 1);
         const Op &op = ops[opcode];
 
         if (!op.handler) {

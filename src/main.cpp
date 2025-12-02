@@ -29,12 +29,12 @@ int main(int argc, char *argv[])
     uint64_t now = SDL_GetPerformanceCounter();
     uint64_t last = now;
     double ns_per_cycle = 559.0;
+    const int CYCLES_PER_SLICE = 1000;
 
     while (1) {
         SDL_PollEvent(&event);
-        if (event.type == SDL_QUIT) {
-            break;
-        }
+        if (event.type == SDL_QUIT) break;
+
         SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0x00);
         SDL_RenderClear(renderer);
         SDL_RenderPresent(renderer);
@@ -43,11 +43,17 @@ int main(int argc, char *argv[])
         double elapsed_ns = (now - last) * 1e9 / SDL_GetPerformanceFrequency();
 
         while (elapsed_ns >= ns_per_cycle) {
-            cpu.clock();
-            elapsed_ns -= ns_per_cycle;
-            last += (uint64_t)(ns_per_cycle * SDL_GetPerformanceFrequency() / 1e9);
+            for (int i = 0; i < CYCLES_PER_SLICE && elapsed_ns >= ns_per_cycle; ++i) {
+                cpu.clock();
+                elapsed_ns -= ns_per_cycle;
+                last += (uint64_t)(ns_per_cycle * SDL_GetPerformanceFrequency() / 1e9);
+            }
+            // Allow SDL to handle input
+            SDL_PollEvent(&event);
+            if (event.type == SDL_QUIT) break;
         }
     }
+
 
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
