@@ -1,7 +1,9 @@
+#pragma once
+
 #include <cstdint>
 #include <cstdio>
 
-#include "opcodes.h"
+typedef struct Bus Bus;
 
 enum CPU_FLAGS {
     FLAG_C = 1 << 0,
@@ -34,6 +36,8 @@ public:
     // status register
     uint8_t sr;
 
+    Bus *bus;
+
     // accumulator, x, and y.
     struct {
         uint8_t ac;
@@ -45,9 +49,8 @@ public:
     ~CPU6502() = default;
 
 
-    uint8_t read(uint16_t addr) {
-        return memory[addr];
-    }
+    uint8_t read(uint16_t addr);
+    void write(uint16_t addr, uint8_t value);
 
     uint16_t read16() {
         uint16_t lo = read(pc++);
@@ -55,9 +58,7 @@ public:
         return lo | (hi << 8);
     }
 
-    void write(uint16_t addr, uint8_t value) {
-        memory[addr] = value;
-    }
+
 
     void set_zn(uint8_t value) {
         status.Z = (value == 0);
@@ -107,5 +108,6 @@ private:
     } status;
     uint64_t cycles;
     uint8_t cycles_remaining = 0;
+
     Op ops[256];
 };

@@ -1,6 +1,7 @@
 #include "SDL.h"
 #include "SDL_video.h"
-#include "emu/cpu/6502.h"
+#include "emu/bus/bus.h"
+#include "src/emu/cartridge/cartridge.h"
 
 int main(int argc, char *argv[])
 {
@@ -22,9 +23,10 @@ int main(int argc, char *argv[])
 
     SDL_SetWindowTitle(window, "nestastic");
 
-    CPU6502 cpu;
-
-    cpu.reset();
+    Bus bus;
+    bus.cart = load_cartridge("./test_code/smb.nes");
+    bus.cpu.reset();
+    bus.cpu.bus = &bus;
 
     uint64_t now = SDL_GetPerformanceCounter();
     uint64_t last = now;
@@ -44,7 +46,7 @@ int main(int argc, char *argv[])
 
         while (elapsed_ns >= ns_per_cycle) {
             for (int i = 0; i < CYCLES_PER_SLICE && elapsed_ns >= ns_per_cycle; ++i) {
-                cpu.clock();
+                bus.cpu.clock();
                 elapsed_ns -= ns_per_cycle;
                 last += (uint64_t)(ns_per_cycle * SDL_GetPerformanceFrequency() / 1e9);
             }

@@ -1,7 +1,14 @@
 //  opcode, mnemonic, addressing_mode, cycles, extra_cycle
 
 OP(0x00, BRK, IMP, 7, 0)
+OP(0x01, ORA, IND_X, 6, 0)
+OP(0x05, ORA, ZP, 3, 0)
+OP(0x06, ASL, ZP, 5, 0)
 OP(0x08, PHP, IMP, 3, 0)
+OP(0x09, ORA, IMM, 2, 0)
+OP(0x0A, ASL, ACC, 2, 0)
+OP(0x0D, ORA, ABS, 4, 0)
+OP(0x0E, ASL, ABS, 6, 0)
 OP(0x10, BPL, REL, 2, 1)
 OP(0x20, JSR, ABS, 6, 0)
 OP(0x28, PLP, IMP, 4, 0)

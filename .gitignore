@@ -3,3 +3,4 @@ build/
 subprojects/*
 *.o
 *.bin
+test_code/*.nes

@@ -1,6 +1,8 @@
 #include "6502.h"
+#include "../bus/bus.h"
 #include <cstdlib>
 #include <cstring>
+#include <sys/types.h>
 
 #define OP(code, name, addr, cyc, extra) \
     void op_##name##_##code(CPU6502 &cpu);
@@ -17,8 +19,55 @@ void op_BRK_0x00(CPU6502 &cpu) {
     cpu.pc = cpu.read16();
 }
 
+void op_ORA_0x01(CPU6502 &cpu) {
+    uint8_t addr = cpu.read(cpu.pc++);
+    uint8_t value = cpu.read(addr);
+    cpu.regs.ac |= value;
+    cpu.set_zn(cpu.regs.ac);
+}
+
+void op_ORA_0x05(CPU6502 &cpu) {
+    uint8_t addr = cpu.read(cpu.pc++);
+    uint8_t value = cpu.read(addr);
+    cpu.regs.ac |= value;
+    cpu.set_zn(cpu.regs.ac);
+}
+
+void op_ASL_0x06(CPU6502 &cpu) {
+    uint8_t addr = cpu.read(cpu.pc++);
+    uint8_t value = cpu.read(addr);
+    cpu.write(addr, value << 1);
+    cpu.set_zn(value << 1);
+}
+
 void op_PHP_0x08(CPU6502 &cpu) {
     cpu.push(cpu.get_status());
+}
+
+void op_ORA_0x09(CPU6502 &cpu) {
+    uint8_t value = cpu.read(cpu.pc++);
+    cpu.regs.ac |= value;
+    cpu.set_zn(cpu.regs.ac);
+}
+
+void op_ASL_0x0A(CPU6502 &cpu) {
+    uint8_t value = cpu.regs.ac;
+    cpu.regs.ac = value << 1;
+    cpu.set_zn(cpu.regs.ac);
+}
+
+void op_ORA_0x0D(CPU6502 &cpu) {
+    uint16_t addr = cpu.read16();
+    uint8_t value = cpu.read(addr);
+    cpu.regs.ac |= value;
+    cpu.set_zn(cpu.regs.ac);
+}
+
+void op_ASL_0x0E(CPU6502 &cpu) {
+    uint16_t addr = cpu.read16();
+    uint8_t value = cpu.read(addr);
+    cpu.write(addr, value << 1);
+    cpu.set_zn(value << 1);
 }
 
 void op_BPL_0x10(CPU6502 &cpu) {
@@ -75,7 +124,6 @@ void op_ADC_0x69(CPU6502 &cpu) {
     uint8_t value = cpu.read(cpu.pc++);
     cpu.regs.ac += value;
     cpu.set_zn(cpu.regs.ac);
-    cpu.reg_dump();
 }
 
 void op_STY_0x84(CPU6502 &cpu) {
@@ -208,6 +256,14 @@ CPU6502::CPU6502() : pc(0), regs(), memory(), cycles(0), cycles_remaining(0) {
     #undef OP
 }
 
+uint8_t CPU6502::read(uint16_t addr) {
+    return bus->read(addr);
+}
+
+void CPU6502::write(uint16_t addr, uint8_t value) {
+    bus->write(addr, value);
+}
+
 void CPU6502::reset() {
     printf("Reset!\n");
 
@@ -218,7 +274,7 @@ void CPU6502::reset() {
 
     status.flags = 0x24;
 
-    for (int i = 0; i < sizeof(memory); i++)
+    for (size_t i = 0; i < sizeof(memory); i++)
         memory[i] = 0xEA;
 
     static const unsigned char imm_arith_bin[] = {
