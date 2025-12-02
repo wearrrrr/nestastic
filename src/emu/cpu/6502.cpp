@@ -1,138 +1,263 @@
 #include "6502.h"
 #include <cstdlib>
+#include <cstring>
 
-#define OP(fn, cycles) { &CPU6502::fn, cycles }
-#define OP_NONE         { nullptr, 0 }
+#define OP(code, name, addr, cyc, extra) \
+    void op_##name##_##code(CPU6502 &cpu);
 
-const Op CPU6502::op_table[256] = {
-    /* 00 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 04 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 08 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 0C */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
+#include "6502_ops.inc"
 
-    /* 10 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 14 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 18 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 1C */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
+#undef OP
 
-    /* 20 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 24 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 28 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 2C */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
+void op_BRK_0x00(CPU6502 &cpu) {
+    cpu.push(cpu.pc >> 8);
+    cpu.push(cpu.pc & 0xFF);
+    cpu.push(cpu.get_status());
+    cpu.sr |= 0x10;
+    cpu.pc = cpu.read16();
+}
 
-    /* 30 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 34 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 38 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 3C */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
+void op_PHP_0x08(CPU6502 &cpu) {
+    cpu.push(cpu.get_status());
+}
 
-    /* 40 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 44 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 48 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 4C */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
+void op_BPL_0x10(CPU6502 &cpu) {
+    if ((cpu.sr & 0x80) == 0) {
+        cpu.pc += cpu.read(cpu.pc++);
+    }
+}
 
-    /* 50 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 54 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 58 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 5C */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
+void op_JSR_0x20(CPU6502 &cpu) {
+    uint16_t addr = cpu.read16();
+    cpu.pc += 2;
+    cpu.push(cpu.pc >> 8);
+    cpu.push(cpu.pc & 0xFF);
+    cpu.pc = addr;
+}
 
-    /* 60 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 64 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 68 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 6C */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
+void op_PLP_0x28(CPU6502 &cpu) {
+    cpu.sr = cpu.pop();
+}
 
-    /* 70 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 74 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 78 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 7C */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
+void op_BMI_0x30(CPU6502 &cpu) {
+    if ((cpu.sr & 0x80) != 0) {
+        cpu.pc += cpu.read(cpu.pc++);
+    }
+}
 
-    /* 80 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 84 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 88 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 8C */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
+void op_PHA_0x48(CPU6502 &cpu) {
+    cpu.push(cpu.regs.ac);
+}
 
-    /* 90 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 94 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 98 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* 9C */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
+void op_JMP_0x4C(CPU6502 &cpu) {
+    uint16_t addr = cpu.read16();
+    cpu.pc = addr;
+    printf("JMP to %04X!\n", addr);
+}
 
-    /* A0 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* A4 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* A8 */ OP_NONE, OP(op_LDA_imm, 2), OP_NONE, OP_NONE,
-    /* AC */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
+void op_RTS_0x60(CPU6502 &cpu) {
+    cpu.pc = cpu.pop();
+    cpu.pc |= cpu.pop() << 8;
+}
 
-    /* B0 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* B4 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* B8 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* BC */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
+void op_ADC_0x65(CPU6502 &cpu) {
+    uint8_t addr = cpu.read(cpu.pc++);
+    uint8_t value = cpu.read(addr);
+    cpu.regs.ac += value;
+    cpu.set_zn(cpu.regs.ac);
+}
 
-    /* C0 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* C4 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* C8 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* CC */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
+void op_PLA_0x68(CPU6502 &cpu) {
+    cpu.regs.ac = cpu.pop();
+    cpu.set_zn(cpu.regs.ac);
+}
 
-    /* D0 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* D4 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* D8 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* DC */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
+void op_ADC_0x69(CPU6502 &cpu) {
+    uint8_t value = cpu.read(cpu.pc++);
+    cpu.regs.ac += value;
+    cpu.set_zn(cpu.regs.ac);
+}
 
-    /* E0 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* E4 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* E8 */ OP_NONE, OP_NONE, OP(op_NOP, 2), OP_NONE,
-    /* EC */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
+void op_STY_0x84(CPU6502 &cpu) {
+    uint8_t addr = cpu.read(cpu.pc++);
+    cpu.write(addr, cpu.regs.y);
+}
 
-    /* F0 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* F4 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* F8 */ OP_NONE, OP_NONE, OP_NONE, OP_NONE,
-    /* FC */ OP_NONE, OP_NONE, OP_NONE, OP_NONE
-};
+void op_STA_0x85(CPU6502 &cpu) {
+    uint8_t addr = cpu.read(cpu.pc++);
+    cpu.write(addr, cpu.regs.ac);
+}
 
-void CPU6502::op_NOP() {
+void op_STX_0x86(CPU6502 &cpu) {
+    uint8_t addr = cpu.read(cpu.pc++);
+    cpu.write(addr, cpu.regs.x);
+}
+
+void op_DEY_0x88(CPU6502 &cpu) {
+    cpu.regs.y--;
+    cpu.set_zn(cpu.regs.y);
+}
+
+void op_STA_0x8D(CPU6502 &cpu) {
+    uint16_t addr = cpu.read16();
+    cpu.pc += 2;
+    cpu.write(addr, cpu.regs.ac);
+}
+
+void op_LDY_0xA0(CPU6502 &cpu) {
+    uint8_t addr = cpu.read(cpu.pc++);
+    cpu.regs.y = cpu.read(addr);
+    cpu.set_zn(cpu.regs.y);
+}
+
+void op_LDX_0xA2(CPU6502 &cpu) {
+    uint8_t value = cpu.read(cpu.pc++);
+    cpu.regs.x = value;
+    cpu.set_zn(cpu.regs.x);
+}
+
+void op_LDA_0xA5(CPU6502 &cpu) {
+    uint8_t addr = cpu.read(cpu.pc++);
+    cpu.regs.ac = cpu.read(addr);
+    cpu.set_zn(cpu.regs.ac);
+}
+
+void op_LDA_0xA9(CPU6502 &cpu) {
+    uint8_t value = cpu.read(cpu.pc++);
+    cpu.regs.ac = value;
+    cpu.set_zn(cpu.regs.ac);
+}
+
+void op_LDA_0xAD(CPU6502 &cpu) {
+    uint16_t addr = cpu.read16();
+    cpu.pc += 2;
+    uint8_t value = cpu.read(addr);
+    cpu.regs.ac = value;
+    cpu.set_zn(cpu.regs.ac);
+}
+
+void op_DEC_0xC6(CPU6502 &cpu) {
+    uint8_t addr = cpu.read(cpu.pc++);
+    uint8_t value = cpu.read(addr);
+    value--;
+    cpu.write(addr, value);
+    cpu.set_zn(value);
+}
+
+void op_INY_0xC8(CPU6502 &cpu) {
+    cpu.regs.y++;
+    cpu.set_zn(cpu.regs.y);
+}
+
+void op_DEX_0xCA(CPU6502 &cpu) {
+    cpu.regs.x--;
+    cpu.set_zn(cpu.regs.x);
+}
+
+void op_BNE_0xD0(CPU6502 &cpu) {
+    int8_t offset = static_cast<int8_t>(cpu.read(cpu.pc++));
+    if ((cpu.get_status() & FLAG_Z) == 0) {
+        cpu.pc += offset;
+    }
+}
+
+void op_INC_0xE6(CPU6502 &cpu) {
+    uint8_t addr = cpu.read(cpu.pc++);
+    uint8_t value = cpu.read(addr);
+    value++;
+    cpu.write(addr, value);
+    cpu.set_zn(value);
+}
+
+void op_INX_0xE8(CPU6502 &cpu) {
+    cpu.regs.x++;
+    cpu.set_zn(cpu.regs.x);
+}
+
+void op_BEQ_0xF0(CPU6502 &cpu) {
+    uint8_t offset = cpu.read(cpu.pc++);
+    if ((cpu.get_status() & FLAG_Z) != 0) {
+        cpu.pc += offset;
+    }
+}
+
+void op_NOP_0xEA(CPU6502 &cpu) {
     // do nothing
 }
 
-void CPU6502::op_LDA_imm() {
-    uint8_t value = read(pc++);
-    regs.A = value;
-    set_zn(regs.A);
-    reg_dump();
+// x-macros
+#define OP(code, name, addr, cyc, extra) \
+    void op_##name##_##code(CPU6502 &cpu);
+
+#include "6502_ops.inc"
+#undef OP
+
+CPU6502::CPU6502() : pc(0), regs(), memory(), cycles(0), cycles_remaining(0) {
+    status.flags = 0x24;
+
+    for (int i = 0; i < 256; ++i) {
+        ops[i].handler = nullptr;
+        ops[i].cycles = 0;
+    }
+
+    #define OP(code, name, addr, cyc, extra) \
+        ops[code].handler = op_##name##_##code; \
+        ops[code].cycles  = cyc;
+
+    #include "6502_ops.inc"
+    #undef OP
 }
 
 void CPU6502::reset() {
     printf("Reset!\n");
-    pc = 0xFFFC;
-    regs.A = 0;
-    regs.X = 0;
-    regs.Y = 0;
-    regs.SP = 0xFF;
+
+    regs.ac = 0;
+    regs.x = 0;
+    regs.y = 0;
+    sp = 0xFF;
+
     status.flags = 0x24;
 
-    for (int i = 0; i < 0x10000; i++)
+    for (int i = 0; i < sizeof(memory); i++)
         memory[i] = 0xEA;
 
-    // For now, throw some demo instructions into the memory
-    memory[0xFFFC] = 0xA9; // LDA #$42
-    memory[0xFFFD] = 0x42;
+    static const uint8_t demo_bin[] = {
+        0xA2, 0x0A,        // LDX #$0A
+        0xCA,              // DEX
+        0xD0, 0xFD,        // BNE $8002
+        0x4C, 0x05, 0x80   // JMP $8005 (infinite loop)
+    };
+    memcpy(&memory[0x8000], demo_bin, sizeof(demo_bin));
+
+    memory[0xFFFC] = 0x00;
+    memory[0xFFFD] = 0x80;
+
+    // Read reset vector
+    pc = memory[0xFFFC] | (memory[0xFFFD] << 8);
+
+    printf("PC: %04X\n", pc);
+
+    cycles_remaining = 0;
 }
 
+
 void CPU6502::clock() {
-    // If we're not currently in the middle of an instruction, fetch a new one
     if (cycles_remaining == 0) {
         uint8_t opcode = read(pc++);
-        const Op &op = op_table[opcode];
+        printf("Opcode: %02X, current address: %04X\n", opcode, pc - 1);
+        const Op &op = ops[opcode];
 
         if (!op.handler) {
             printf("Unimplemented opcode: %02X\n", opcode);
             exit(1);
         }
 
-        // Execute the instruction
-        (this->*op.handler)();
+        op.handler(*this);
 
         // Load the base cycle cost
         cycles_remaining = op.cycles;
     }
 
-    // One cycle passes
     cycles_remaining--;
     cycles++;
 }

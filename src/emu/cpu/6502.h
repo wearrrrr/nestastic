@@ -3,18 +3,45 @@
 
 #include "opcodes.h"
 
+enum CPU_FLAGS {
+    FLAG_C = 1 << 0,
+    FLAG_Z = 1 << 1,
+    FLAG_I = 1 << 2,
+    FLAG_D = 1 << 3,
+    FLAG_B = 1 << 4,
+    FLAG_U = 1 << 5,
+    FLAG_V = 1 << 6,
+    FLAG_N = 1 << 7
+};
+
 typedef class CPU6502 CPU6502;
 
+typedef void (*OpHandler)(CPU6502 &);
+
 struct Op {
-    void (CPU6502::*handler)();
+    OpHandler handler;
     uint8_t cycles;
 };
 
 class CPU6502 {
 public:
-    CPU6502() : memory(), pc(0), regs(), cycles(0) {
-        this->status.flags = 0x24;
-    }
+
+    // program counter
+    uint16_t pc;
+    // stack pointer and stack
+    uint8_t sp;
+    uint8_t stack[0x100];
+    // status register
+    uint8_t sr;
+
+    // accumulator, x, and y.
+    struct {
+        uint8_t ac;
+        uint8_t x;
+        uint8_t y;
+    } regs;
+
+    CPU6502();
     ~CPU6502() = default;
 
 
@@ -38,24 +65,33 @@ public:
     }
 
     void reg_dump() {
-        printf("A: %02X X: %02X Y: %02X SP: %02X\n", regs.A, regs.X, regs.Y, regs.SP);
+        printf("A: %02X X: %02X Y: %02X SP: %02X\n", regs.ac, regs.x, regs.y, sp);
+    }
+
+    uint8_t get_status() {
+        return status.flags;
+    }
+
+    void push(uint8_t value) {
+        stack[sp--] = value;
+    }
+
+    uint8_t pop() {
+        sp++;
+        return stack[sp];
     }
 
     void reset();
     void clock();
 
     void op_NOP();
+    void op_STA_zp();
+    void op_LDA_zp();
     void op_LDA_imm();
+    void op_LDA_abs();
 
 private:
     uint8_t memory[0x10000];
-    uint16_t pc;
-    struct {
-        uint8_t A;
-        uint8_t X;
-        uint8_t Y;
-        uint8_t SP;
-    } regs;
     union {
         uint8_t flags;
         struct {
@@ -71,5 +107,5 @@ private:
     } status;
     uint64_t cycles;
     uint8_t cycles_remaining = 0;
-    static const Op op_table[256];
+    Op ops[256];
 };
