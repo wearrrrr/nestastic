@@ -307,6 +307,16 @@ void op_SEC_0x38(CPU6502 &cpu) {
     cpu.set_flag(FLAG_C, 1);
 }
 
+void op_AND_0x39(CPU6502 &cpu) {
+    uint8_t lo = cpu.read(cpu.pc++);
+    uint8_t hi = cpu.read(cpu.pc++);
+    uint16_t base = (hi << 8) | lo;
+    uint16_t addr = base + cpu.regs.y;
+    uint8_t value = cpu.read(addr);
+    cpu.regs.ac &= value;
+    cpu.set_zn(cpu.regs.ac);
+}
+
 void op_AND_0x3D(CPU6502 &cpu) {
     uint8_t lo = cpu.read(cpu.pc++);
     uint8_t hi = cpu.read(cpu.pc++);
@@ -1174,7 +1184,8 @@ void CPU6502::clock() {
 
             if (!op.handler) {
                 printf("Unimplemented opcode: %02X\n", opcode);
-                exit(1);
+                return;
+                // exit(1);
             }
 
             op.handler(*this);
