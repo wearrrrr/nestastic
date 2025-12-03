@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <cstdio>
 
-typedef struct Bus Bus;
+typedef class Bus Bus;
 
 enum CPU_FLAGS {
     FLAG_C = 1 << 0,
@@ -33,8 +33,6 @@ public:
     // stack pointer and stack
     uint8_t sp;
     uint8_t stack[0x100];
-    // status register
-    uint8_t sr;
 
     Bus *bus;
 
@@ -45,8 +43,26 @@ public:
         uint8_t y;
     } regs;
 
+    union {
+        uint8_t flags;
+        struct {
+            uint8_t C : 1;
+            uint8_t Z : 1;
+            uint8_t I : 1;
+            uint8_t D : 1;
+            uint8_t B : 1;
+            uint8_t U : 1;
+            uint8_t V : 1;
+            uint8_t N : 1;
+        };
+    } status;
+
     CPU6502();
     ~CPU6502() = default;
+
+    void Connect(Bus *bus) {
+        this->bus = bus;
+    }
 
 
     uint8_t read(uint16_t addr);
@@ -58,7 +74,10 @@ public:
         return lo | (hi << 8);
     }
 
-
+    void set_flag(uint8_t flag, bool v) {
+        if (v) status.flags |= flag;
+        else   status.flags &= ~flag;
+    }
 
     void set_zn(uint8_t value) {
         status.Z = (value == 0);
@@ -84,30 +103,13 @@ public:
 
     void reset();
     void clock();
-
-    void op_NOP();
-    void op_STA_zp();
-    void op_LDA_zp();
-    void op_LDA_imm();
-    void op_LDA_abs();
+    void nmi();
 
 private:
     uint8_t memory[0x10000];
-    union {
-        uint8_t flags;
-        struct {
-            uint8_t C : 1;
-            uint8_t Z : 1;
-            uint8_t I : 1;
-            uint8_t D : 1;
-            uint8_t B : 1;
-            uint8_t U : 1;
-            uint8_t V : 1;
-            uint8_t N : 1;
-        };
-    } status;
     uint64_t cycles;
     uint8_t cycles_remaining = 0;
+    bool nmi_pending = false;
 
     Op ops[256];
 };

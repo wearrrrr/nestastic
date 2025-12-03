@@ -2,6 +2,7 @@
 #include <fstream>
 
 #include "cartridge.h"
+#include "src/emu/mapper/000/000.h"
 
 Cartridge* load_cartridge(std::string path) {
     std::ifstream file(path, std::ios::binary);
@@ -17,8 +18,17 @@ Cartridge* load_cartridge(std::string path) {
     int prg_size = header[4] * 16 * 1024;
     int chr_size = header[5] * 8 * 1024;
 
-    cart->mapper = (header[6] >> 4) | (header[7] & 0xF0);
-    cart->mirroring_vertical = header[6] & 0x01;
+    cart->mapperID = ((header[7] >> 4) << 4) | (header[6] >> 4);
+    switch (cart->mapperID) {
+        case 0:
+            cart->mapper = new Mapper_000(header[4], header[5]);
+            break;
+        default:
+            throw std::runtime_error("Unsupported mapper: " + std::to_string(cart->mapperID));
+    }
+    cart->mirroring_type =
+        (header[6] & 0x01) ? Cartridge::Mirroring::VERTICAL
+                           : Cartridge::Mirroring::HORIZONTAL;
 
     // Ignore trainer if present
     if (header[6] & 0x04)
@@ -36,4 +46,48 @@ Cartridge* load_cartridge(std::string path) {
     }
 
     return cart;
+}
+
+bool Cartridge::cpuRead(uint16_t addr, uint8_t &data) {
+    uint32_t mapped_addr = 0;
+
+    if (mapper->cpuMapRead(addr, mapped_addr)) {
+        data = prg[mapped_addr];
+        return true;
+    }
+
+    return false;
+}
+
+bool Cartridge::cpuWrite(uint16_t addr, uint8_t data) {
+    uint32_t mapped_addr = 0;
+
+    if (mapper->cpuMapWrite(addr, mapped_addr, data)) {
+        prg[mapped_addr] = data; // Only if CHR RAM/PRG RAM
+        return true;
+    }
+
+    return false;
+}
+
+bool Cartridge::ppuRead(uint16_t addr, uint8_t &data) {
+    uint32_t mapped_addr = 0;
+
+    if (mapper->ppuMapRead(addr, mapped_addr)) {
+        data = chr[mapped_addr];
+        return true;
+    }
+
+    return false;
+}
+
+bool Cartridge::ppuWrite(uint16_t addr, uint8_t data) {
+    uint32_t mapped_addr = 0;
+
+    if (mapper->ppuMapWrite(addr, mapped_addr)) {
+        chr[mapped_addr] = data;
+        return true;
+    }
+
+    return false;
 }

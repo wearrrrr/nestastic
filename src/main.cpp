@@ -9,6 +9,7 @@ int main(int argc, char *argv[])
     SDL_Renderer *renderer;
     // SDL_Surface *surface;
     SDL_Event event;
+    SDL_Texture* texture = nullptr;
 
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't initialize SDL: %s", SDL_GetError());
@@ -21,39 +22,32 @@ int main(int argc, char *argv[])
         return 3;
     }
 
+    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, 256, 240);
+
     SDL_SetWindowTitle(window, "nestastic");
 
-    Bus bus;
-    bus.cart = load_cartridge("./test_code/smb.nes");
+    Bus bus("./test_code/dk.nes");
     bus.cpu.reset();
-    bus.cpu.bus = &bus;
 
-    uint64_t now = SDL_GetPerformanceCounter();
-    uint64_t last = now;
-    double ns_per_cycle = 559.0;
-    const int CYCLES_PER_SLICE = 1000;
-
-    while (1) {
-        SDL_PollEvent(&event);
-        if (event.type == SDL_QUIT) break;
-
-        SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0x00);
-        SDL_RenderClear(renderer);
-        SDL_RenderPresent(renderer);
-
-        now = SDL_GetPerformanceCounter();
-        double elapsed_ns = (now - last) * 1e9 / SDL_GetPerformanceFrequency();
-
-        while (elapsed_ns >= ns_per_cycle) {
-            for (int i = 0; i < CYCLES_PER_SLICE && elapsed_ns >= ns_per_cycle; ++i) {
-                bus.cpu.clock();
-                elapsed_ns -= ns_per_cycle;
-                last += (uint64_t)(ns_per_cycle * SDL_GetPerformanceFrequency() / 1e9);
+    bool running = true;
+    while (running) {
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_QUIT) {
+                running = false;
+                break;
             }
-            // Allow SDL to handle input
-            SDL_PollEvent(&event);
-            if (event.type == SDL_QUIT) break;
         }
+        if (!running) break;
+
+        while (!bus.ppu.frame_complete) {
+            bus.clock();
+        }
+        bus.ppu.frame_complete = false;
+
+        SDL_UpdateTexture(texture, nullptr, bus.ppu.framebuffer, 256 * sizeof(uint32_t));
+        SDL_RenderClear(renderer);
+        SDL_RenderCopy(renderer, texture, nullptr, nullptr);
+        SDL_RenderPresent(renderer);
     }
 
 
