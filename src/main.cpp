@@ -25,8 +25,40 @@ int main(int argc, char *argv[])
 
     SDL_SetWindowTitle(window, "nestastic");
 
-    Bus bus("./test_code/dk.nes");
+    Bus bus("./test_code/balloonfight.nes");
     bus.cpu.reset();
+
+    auto handle_key = [&bus](SDL_Keycode key, bool pressed) {
+        switch (key) {
+            case SDLK_x:
+                bus.set_controller_button(0, Bus::BUTTON_A, pressed);
+                break;
+            case SDLK_z:
+                bus.set_controller_button(0, Bus::BUTTON_B, pressed);
+                break;
+            case SDLK_RSHIFT:
+            case SDLK_LSHIFT:
+                bus.set_controller_button(0, Bus::BUTTON_SELECT, pressed);
+                break;
+            case SDLK_RETURN:
+                bus.set_controller_button(0, Bus::BUTTON_START, pressed);
+                break;
+            case SDLK_UP:
+                bus.set_controller_button(0, Bus::BUTTON_UP, pressed);
+                break;
+            case SDLK_DOWN:
+                bus.set_controller_button(0, Bus::BUTTON_DOWN, pressed);
+                break;
+            case SDLK_LEFT:
+                bus.set_controller_button(0, Bus::BUTTON_LEFT, pressed);
+                break;
+            case SDLK_RIGHT:
+                bus.set_controller_button(0, Bus::BUTTON_RIGHT, pressed);
+                break;
+            default:
+                break;
+        }
+    };
 
     bool running = true;
     while (running) {
@@ -34,6 +66,10 @@ int main(int argc, char *argv[])
             if (event.type == SDL_QUIT) {
                 running = false;
                 break;
+            } else if (event.type == SDL_KEYDOWN && event.key.repeat == 0) {
+                handle_key(event.key.keysym.sym, true);
+            } else if (event.type == SDL_KEYUP) {
+                handle_key(event.key.keysym.sym, false);
             }
         }
         if (!running) break;

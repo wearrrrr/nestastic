@@ -321,6 +321,7 @@ void PPU::reset()
 	sprite_count = 0;
 	sprite_zero_hit_possible = false;
 	sprite_zero_being_rendered = false;
+	sprite_zero_scanline = 0xFF;
 }
 
 void PPU::clock()
@@ -716,6 +717,7 @@ void PPU::clock()
 			std::memset(sprite_shifter_pattern_hi, 0, sizeof(sprite_shifter_pattern_hi));
 			sprite_count = 0;
 			sprite_zero_hit_possible = false;
+			sprite_zero_scanline = 0xFF;
 
 			uint8_t sprite_height = ctrl.sprite_size ? 16 : 8;
 
@@ -726,12 +728,14 @@ void PPU::clock()
 				{
 					if (sprite_count < 8)
 					{
-						if (i == 0)
-							sprite_zero_hit_possible = true;
-
 						spriteScanline[sprite_count] = OAM[i];
 						sprite_shifter_pattern_lo[sprite_count] = 0;
 						sprite_shifter_pattern_hi[sprite_count] = 0;
+						if (i == 0)
+						{
+							sprite_zero_hit_possible = true;
+							sprite_zero_scanline = sprite_count;
+						}
 						sprite_count++;
 					}
 					else
@@ -821,6 +825,12 @@ void PPU::clock()
 		{
 			// Effectively end of frame, so set vertical blank flag
 			status.vblank = 1;
+			static int vblank_logs = 0;
+			if (vblank_logs < 5)
+			{
+				std::printf("PPU entering vblank\n");
+				vblank_logs++;
+			}
 
 			// If the control register tells us to emit a NMI when
 			// entering vertical blanking period, do it! The CPU
@@ -867,7 +877,7 @@ void PPU::clock()
 				{
 					sprite_palette = (spriteScanline[i].attribute & 0x03) + 0x04;
 					sprite_priority = (spriteScanline[i].attribute & 0x20) == 0;
-					sprite_zero_being_rendered = (i == 0) && sprite_zero_hit_possible;
+					sprite_zero_being_rendered = (i == sprite_zero_scanline) && sprite_zero_hit_possible;
 					break;
 				}
 			}

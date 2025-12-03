@@ -90,6 +90,7 @@ private:
     uint8_t sprite_count = 0;
     bool sprite_zero_hit_possible = false;
     bool sprite_zero_being_rendered = false;
+    uint8_t sprite_zero_scanline = 0xFF;
     uint8_t sprite_shifter_pattern_lo[8];
     uint8_t sprite_shifter_pattern_hi[8];
 

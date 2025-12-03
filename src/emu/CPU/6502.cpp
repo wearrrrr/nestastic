@@ -1297,6 +1297,14 @@ void op_NOP_0xEA(CPU6502 &cpu) {
     // do nothing
 }
 
+void op_CPX_0xEC(CPU6502 &cpu) {
+    uint8_t value = cpu.read(cpu.pc++);
+    uint8_t X = cpu.regs.x;
+    uint8_t result = X - value;
+    cpu.set_zn(result);
+    cpu.set_flag(FLAG_C, X >= value);
+}
+
 void op_SBC_0xED(CPU6502 &cpu) {
     uint16_t addr = cpu.read16();
     uint8_t value = cpu.read(addr);
