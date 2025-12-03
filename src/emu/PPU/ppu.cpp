@@ -2,6 +2,7 @@
 #include "../bus/bus.h"
 #include <cstring>
 #include <cstdio>
+#include <algorithm>
 
 PPU::PPU() : bus(nullptr) {
 	reset();
@@ -17,8 +18,33 @@ void PPU::connect(Bus *bus) {
 
 uint32_t PPU::GetColorFromPaletteRam(uint8_t palette, uint8_t pixel)
 {
-	return nesPalette[ppuRead(0x3F00 + (palette << 2) + pixel) & 0x3F];
+	uint8_t index = ppuRead(0x3F00 + (palette << 2) + pixel) & 0x3F;
+	uint32_t color = nesPalette[index];
+	uint8_t r = static_cast<uint8_t>((color >> 16) & 0xFF);
+	uint8_t g = static_cast<uint8_t>((color >> 8) & 0xFF);
+	uint8_t b = static_cast<uint8_t>(color & 0xFF);
+
+	if (mask.emphasize_red || mask.emphasize_green || mask.emphasize_blue)
+	{
+		auto apply_emphasis = [](uint8_t channel, bool emphasize) -> uint8_t
+		{
+			float value = static_cast<float>(channel);
+			const float boost = emphasize ? 1.15f : 0.92f;
+			value *= boost;
+			value = std::clamp(value, 0.0f, 255.0f);
+			return static_cast<uint8_t>(value);
+		};
+
+		r = apply_emphasis(r, mask.emphasize_red);
+		g = apply_emphasis(g, mask.emphasize_green);
+		b = apply_emphasis(b, mask.emphasize_blue);
+	}
+
+	return (static_cast<uint32_t>(r) << 16) |
+	       (static_cast<uint32_t>(g) << 8)  |
+	        static_cast<uint32_t>(b);
 }
+
 
 uint8_t PPU::cpuRead(uint16_t addr, bool rdonly)
 {
@@ -36,22 +62,22 @@ uint8_t PPU::cpuRead(uint16_t addr, bool rdonly)
 	}
 	else
 	{
-        if (addr == 0x0002) {
-            data = (status.reg & 0xE0) | (ppu_data_buffer & 0x1F);
+		if (addr == 0x0002) {
+			data = (status.reg & 0xE0) | (ppu_data_buffer & 0x1F);
 			status.vblank = 0;
 			address_latch = 0;
-        } else if (addr == 0x0004) {
+		} else if (addr == 0x0004) {
 			data = oamRead(oam_addr);
-        } else if (addr == 0x0007) {
-      		// reads here are delayed by one cycle. (except for palette reads)
+		} else if (addr == 0x0007) {
 			data = ppu_data_buffer;
-			ppu_data_buffer = ppuRead(vram_addr.reg);
-			// palette reads are not delayed
-			if (vram_addr.reg >= 0x3F00) data = ppu_data_buffer;
-
-			// Automatically increment the nametable address
+			uint16_t current_addr = vram_addr.reg;
+			ppu_data_buffer = ppuRead(current_addr);
+			if (current_addr >= 0x3F00)
+			{
+				data = ppu_data_buffer;
+			}
 			vram_addr.reg += (ctrl.increment ? 32 : 1);
-        }
+		}
 	}
 
 	return data;
@@ -273,6 +299,7 @@ void PPU::reset()
 	ppu_data_buffer = 0x00;
 	scanline = 0;
 	cycle = 0;
+	odd_frame = false;
 	bg_next_tile_id = 0x00;
 	bg_next_tile_attrib = 0x00;
 	bg_next_tile_lsb = 0x00;
@@ -491,9 +518,9 @@ void PPU::clock()
 	// at -1, is used to configure the "shifters" for the first visible scanline, 0.
 	if (scanline >= -1 && scanline < 240)
 	{
-		if (scanline == 0 && cycle == 0)
+		if (scanline == 0 && cycle == 0 && odd_frame && (mask.show_bg || mask.show_spr))
 		{
-			// "Odd Frame" cycle skip
+			// "Odd Frame" cycle skip matches hardware behavior when rendering
 			cycle = 1;
 		}
 
@@ -921,6 +948,7 @@ void PPU::clock()
 		{
 			scanline = -1;
 			frame_complete = true;
+			odd_frame = !odd_frame;
 		}
 	}
 }

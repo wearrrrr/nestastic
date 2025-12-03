@@ -246,6 +246,45 @@ static void isb(CPU6502 &cpu, uint16_t addr)
     sbc(cpu, value);
 }
 
+static void dcp(CPU6502 &cpu, uint16_t addr)
+{
+    uint8_t value = cpu.read(addr);
+    value--;
+    cpu.write(addr, value);
+    uint8_t A = cpu.regs.ac;
+    uint8_t result = A - value;
+    cpu.set_flag(FLAG_C, A >= value);
+    cpu.set_zn(result);
+}
+
+static void sre(CPU6502 &cpu, uint16_t addr)
+{
+    uint8_t value = cpu.read(addr);
+    cpu.set_flag(FLAG_C, value & 0x01);
+    value >>= 1;
+    cpu.write(addr, value);
+    cpu.regs.ac ^= value;
+    cpu.set_zn(cpu.regs.ac);
+}
+
+static void slo(CPU6502 &cpu, uint16_t addr)
+{
+    uint8_t value = cpu.read(addr);
+    cpu.set_flag(FLAG_C, value & 0x80);
+    value <<= 1;
+    cpu.write(addr, value);
+    cpu.regs.ac |= value;
+    cpu.set_zn(cpu.regs.ac);
+}
+
+static void lax(CPU6502 &cpu, uint16_t addr)
+{
+    uint8_t value = cpu.read(addr);
+    cpu.regs.ac = value;
+    cpu.regs.x = value;
+    cpu.set_zn(value);
+}
+
 void op_ROL_0x2A(CPU6502 &cpu) {
     cpu.regs.ac = rotate_left(cpu, cpu.regs.ac);
 }
@@ -372,6 +411,53 @@ void op_EOR_0x49(CPU6502 &cpu) {
     cpu.set_zn(cpu.regs.ac);
 }
 
+void op_EOR_0x4D(CPU6502 &cpu)
+{
+    uint16_t addr = cpu.read16();
+    uint8_t value = cpu.read(addr);
+    cpu.regs.ac ^= value;
+    cpu.set_zn(cpu.regs.ac);
+}
+
+void op_EOR_0x51(CPU6502 &cpu)
+{
+    uint8_t zp = cpu.read(cpu.pc++);
+    uint8_t lo = cpu.read(zp);
+    uint8_t hi = cpu.read(static_cast<uint8_t>(zp + 1));
+    uint16_t addr = (static_cast<uint16_t>(hi) << 8) | lo;
+    addr += cpu.regs.y;
+    uint8_t value = cpu.read(addr);
+    cpu.regs.ac ^= value;
+    cpu.set_zn(cpu.regs.ac);
+}
+
+void op_EOR_0x55(CPU6502 &cpu)
+{
+    uint8_t zp = cpu.read(cpu.pc++);
+    uint8_t addr = static_cast<uint8_t>(zp + cpu.regs.x);
+    uint8_t value = cpu.read(addr);
+    cpu.regs.ac ^= value;
+    cpu.set_zn(cpu.regs.ac);
+}
+
+void op_EOR_0x59(CPU6502 &cpu)
+{
+    uint16_t base = cpu.read16();
+    uint16_t addr = base + cpu.regs.y;
+    uint8_t value = cpu.read(addr);
+    cpu.regs.ac ^= value;
+    cpu.set_zn(cpu.regs.ac);
+}
+
+void op_EOR_0x5D(CPU6502 &cpu)
+{
+    uint16_t base = cpu.read16();
+    uint16_t addr = base + cpu.regs.x;
+    uint8_t value = cpu.read(addr);
+    cpu.regs.ac ^= value;
+    cpu.set_zn(cpu.regs.ac);
+}
+
 void op_LSR_0x4A(CPU6502 &cpu) {
     uint8_t value = cpu.regs.ac;
     cpu.set_flag(FLAG_C, value & 0x01);
@@ -394,6 +480,111 @@ void op_BVC_0x50(CPU6502 &cpu) {
     }
 }
 
+
+void op_SRE_0x43(CPU6502 &cpu)
+{
+    uint8_t zp = cpu.read(cpu.pc++);
+    uint8_t ptr = static_cast<uint8_t>(zp + cpu.regs.x);
+    uint8_t lo = cpu.read(ptr);
+    uint8_t hi = cpu.read(static_cast<uint8_t>(ptr + 1));
+    uint16_t addr = (static_cast<uint16_t>(hi) << 8) | lo;
+    sre(cpu, addr);
+}
+
+void op_SRE_0x47(CPU6502 &cpu)
+{
+    uint8_t addr = cpu.read(cpu.pc++);
+    sre(cpu, addr);
+}
+
+void op_SRE_0x4F(CPU6502 &cpu)
+{
+    uint16_t addr = cpu.read16();
+    sre(cpu, addr);
+}
+
+void op_SRE_0x53(CPU6502 &cpu)
+{
+    uint8_t zp = cpu.read(cpu.pc++);
+    uint8_t lo = cpu.read(zp);
+    uint8_t hi = cpu.read(static_cast<uint8_t>(zp + 1));
+    uint16_t addr = (static_cast<uint16_t>(hi) << 8) | lo;
+    addr += cpu.regs.y;
+    sre(cpu, addr);
+}
+
+void op_SRE_0x57(CPU6502 &cpu)
+{
+    uint8_t zp = cpu.read(cpu.pc++);
+    uint8_t addr = static_cast<uint8_t>(zp + cpu.regs.x);
+    sre(cpu, addr);
+}
+
+void op_SRE_0x5B(CPU6502 &cpu)
+{
+    uint16_t base = cpu.read16();
+    uint16_t addr = base + cpu.regs.y;
+    sre(cpu, addr);
+}
+
+void op_SRE_0x5F(CPU6502 &cpu)
+{
+    uint16_t base = cpu.read16();
+    uint16_t addr = base + cpu.regs.x;
+    sre(cpu, addr);
+}
+
+void op_SLO_0x03(CPU6502 &cpu)
+{
+    uint8_t zp = cpu.read(cpu.pc++);
+    uint8_t lo = cpu.read(static_cast<uint8_t>(zp + cpu.regs.x));
+    uint8_t hi = cpu.read(static_cast<uint8_t>(zp + cpu.regs.x + 1));
+    uint16_t addr = (static_cast<uint16_t>(hi) << 8) | lo;
+    slo(cpu, addr);
+}
+
+void op_SLO_0x07(CPU6502 &cpu)
+{
+    uint8_t addr = cpu.read(cpu.pc++);
+    slo(cpu, addr);
+}
+
+void op_SLO_0x0F(CPU6502 &cpu)
+{
+    uint16_t addr = cpu.read16();
+    slo(cpu, addr);
+}
+
+void op_SLO_0x13(CPU6502 &cpu)
+{
+    uint8_t zp = cpu.read(cpu.pc++);
+    uint8_t lo = cpu.read(zp);
+    uint8_t hi = cpu.read(static_cast<uint8_t>(zp + 1));
+    uint16_t addr = (static_cast<uint16_t>(hi) << 8) | lo;
+    addr += cpu.regs.y;
+    slo(cpu, addr);
+}
+
+void op_SLO_0x17(CPU6502 &cpu)
+{
+    uint8_t zp = cpu.read(cpu.pc++);
+    uint8_t addr = static_cast<uint8_t>(zp + cpu.regs.x);
+    slo(cpu, addr);
+}
+
+void op_SLO_0x1B(CPU6502 &cpu)
+{
+    uint16_t addr = cpu.read16();
+    addr += cpu.regs.y;
+    slo(cpu, addr);
+}
+
+void op_SLO_0x1F(CPU6502 &cpu)
+{
+    uint16_t addr = cpu.read16();
+    addr += cpu.regs.x;
+    slo(cpu, addr);
+}
 void op_RTS_0x60(CPU6502 &cpu) {
     uint8_t lo = cpu.pop();
     uint8_t hi = cpu.pop();
@@ -613,7 +804,21 @@ void op_SHY_0x9C(CPU6502 &cpu) {
     uint16_t base = (hi << 8) | lo;
 
     uint16_t addr = base + cpu.regs.x;
-    cpu.write(addr, cpu.regs.y);
+    uint8_t mask = static_cast<uint8_t>(((addr >> 8) + 1) & 0xFF);
+    uint8_t value = cpu.regs.y & mask;
+    cpu.write(addr, value);
+}
+
+void op_SHX_0x9E(CPU6502 &cpu)
+{
+    uint8_t lo = cpu.read(cpu.pc++);
+    uint8_t hi = cpu.read(cpu.pc++);
+    uint16_t base = (hi << 8) | lo;
+
+    uint16_t addr = base + cpu.regs.y;
+    uint8_t mask = static_cast<uint8_t>(((addr >> 8) + 1) & 0xFF);
+    uint8_t value = cpu.regs.x & mask;
+    cpu.write(addr, value);
 }
 
 void op_LDY_0xA0(CPU6502 &cpu) {
@@ -654,6 +859,27 @@ void op_LDX_0xA6(CPU6502 &cpu) {
     uint8_t addr = cpu.read(cpu.pc++);
     cpu.regs.x = cpu.read(addr);
     cpu.set_zn(cpu.regs.x);
+}
+
+void op_LAX_0xA3(CPU6502 &cpu)
+{
+    uint8_t zp = cpu.read(cpu.pc++);
+    uint8_t lo_ptr = cpu.read(static_cast<uint8_t>(zp + cpu.regs.x));
+    uint8_t hi_ptr = cpu.read(static_cast<uint8_t>(zp + cpu.regs.x + 1));
+    uint16_t addr = (static_cast<uint16_t>(hi_ptr) << 8) | lo_ptr;
+    lax(cpu, addr);
+}
+
+void op_LAX_0xA7(CPU6502 &cpu)
+{
+    uint8_t addr = cpu.read(cpu.pc++);
+    lax(cpu, addr);
+}
+
+void op_LAX_0xAF(CPU6502 &cpu)
+{
+    uint16_t addr = cpu.read16();
+    lax(cpu, addr);
 }
 
 void op_TAY_0xA8(CPU6502 &cpu) {
@@ -727,6 +953,23 @@ void op_LDX_0xB6(CPU6502 &cpu) {
     cpu.set_zn(cpu.regs.x);
 }
 
+void op_LAX_0xB3(CPU6502 &cpu)
+{
+    uint8_t zp = cpu.read(cpu.pc++);
+    uint8_t lo_ptr = cpu.read(zp);
+    uint8_t hi_ptr = cpu.read(static_cast<uint8_t>(zp + 1));
+    uint16_t addr = (static_cast<uint16_t>(hi_ptr) << 8) | lo_ptr;
+    addr += cpu.regs.y;
+    lax(cpu, addr);
+}
+
+void op_LAX_0xB7(CPU6502 &cpu)
+{
+    uint8_t zp = cpu.read(cpu.pc++);
+    uint8_t addr = static_cast<uint8_t>(zp + cpu.regs.y);
+    lax(cpu, addr);
+}
+
 void op_CLV_0xB8(CPU6502 &cpu) {
     cpu.set_flag(FLAG_V, 0);
 }
@@ -782,16 +1025,11 @@ void op_LDX_0xBE(CPU6502 &cpu) {
     cpu.set_zn(value);
 }
 
-void op_LDA_0xBF(CPU6502 &cpu) {
-    uint8_t lo = cpu.read(cpu.pc++);
-    uint8_t hi = cpu.read(cpu.pc++);
-    uint16_t base = (hi << 8) | lo;
-
+void op_LAX_0xBF(CPU6502 &cpu)
+{
+    uint16_t base = cpu.read16();
     uint16_t addr = base + cpu.regs.y;
-    uint8_t value = cpu.read(addr);
-
-    cpu.regs.ac = value;
-    cpu.set_zn(value);
+    lax(cpu, addr);
 }
 
 void op_CPY_0xC0(CPU6502 &cpu) {
@@ -862,9 +1100,7 @@ void op_DEX_0xCA(CPU6502 &cpu) {
 }
 
 void op_CMP_0xCD(CPU6502 &cpu) {
-    uint16_t addr = cpu.read(cpu.pc) | (cpu.read(cpu.pc++) << 8);
-    cpu.pc += 2;
-
+    uint16_t addr = cpu.read16();
     uint8_t value = cpu.read(addr);
     uint8_t A = cpu.regs.ac;
     uint8_t result = A - value;
@@ -893,20 +1129,38 @@ void op_BNE_0xD0(CPU6502 &cpu) {
     }
 }
 
+void op_CMP_0xD1(CPU6502 &cpu)
+{
+    uint8_t zp = cpu.read(cpu.pc++);
+    uint8_t lo = cpu.read(zp);
+    uint8_t hi = cpu.read(static_cast<uint8_t>(zp + 1));
+    uint16_t addr = (static_cast<uint16_t>(hi) << 8) | lo;
+    addr += cpu.regs.y;
+    uint8_t value = cpu.read(addr);
+    uint8_t A = cpu.regs.ac;
+    uint8_t result = A - value;
+    cpu.set_zn(result);
+    cpu.set_flag(FLAG_C, A >= value);
+}
+
 void op_DCP_0xD3(CPU6502 &cpu) {
     uint8_t zp = cpu.read(cpu.pc++);
-    uint8_t ptr_lo = cpu.read(zp);
-    uint8_t ptr_hi = cpu.read(static_cast<uint8_t>(zp + 1));
-    uint16_t addr = (static_cast<uint16_t>(ptr_hi) << 8) | ptr_lo;
+    uint8_t lo = cpu.read(zp);
+    uint8_t hi = cpu.read(static_cast<uint8_t>(zp + 1));
+    uint16_t addr = (static_cast<uint16_t>(hi) << 8) | lo;
     addr += cpu.regs.y;
+    dcp(cpu, addr);
+}
 
+void op_CMP_0xD5(CPU6502 &cpu)
+{
+    uint8_t zp = cpu.read(cpu.pc++);
+    uint8_t addr = static_cast<uint8_t>(zp + cpu.regs.x);
     uint8_t value = cpu.read(addr);
-    value--;
-    cpu.write(addr, value);
-
-    uint8_t result = cpu.regs.ac - value;
+    uint8_t A = cpu.regs.ac;
+    uint8_t result = A - value;
     cpu.set_zn(result);
-    cpu.set_flag(FLAG_C, cpu.regs.ac >= value);
+    cpu.set_flag(FLAG_C, A >= value);
 }
 
 void op_DEC_0xD6(CPU6502 &cpu) {
@@ -921,6 +1175,70 @@ void op_DEC_0xD6(CPU6502 &cpu) {
 
 void op_CLD_0xD8(CPU6502 &cpu) {
     cpu.set_flag(FLAG_D, false);
+}
+
+void op_DCP_0xC3(CPU6502 &cpu)
+{
+    uint8_t zp = cpu.read(cpu.pc++);
+    uint8_t ptr = static_cast<uint8_t>(zp + cpu.regs.x);
+    uint8_t lo = cpu.read(ptr);
+    uint8_t hi = cpu.read(static_cast<uint8_t>(ptr + 1));
+    uint16_t addr = (static_cast<uint16_t>(hi) << 8) | lo;
+    dcp(cpu, addr);
+}
+
+void op_DCP_0xC7(CPU6502 &cpu)
+{
+    uint8_t addr = cpu.read(cpu.pc++);
+    dcp(cpu, addr);
+}
+
+void op_DCP_0xCF(CPU6502 &cpu)
+{
+    uint16_t addr = cpu.read16();
+    dcp(cpu, addr);
+}
+
+void op_DCP_0xD7(CPU6502 &cpu)
+{
+    uint8_t zp = cpu.read(cpu.pc++);
+    uint8_t addr = static_cast<uint8_t>(zp + cpu.regs.x);
+    dcp(cpu, addr);
+}
+
+void op_DCP_0xDB(CPU6502 &cpu)
+{
+    uint16_t base = cpu.read16();
+    uint16_t addr = base + cpu.regs.y;
+    dcp(cpu, addr);
+}
+
+void op_CMP_0xD9(CPU6502 &cpu)
+{
+    uint16_t base = cpu.read16();
+    uint16_t addr = base + cpu.regs.y;
+    uint8_t value = cpu.read(addr);
+    uint8_t A = cpu.regs.ac;
+    uint8_t result = A - value;
+    cpu.set_zn(result);
+    cpu.set_flag(FLAG_C, A >= value);
+}
+
+void op_CMP_0xDD(CPU6502 &cpu) {
+    uint16_t base = cpu.read16();
+    uint16_t addr = base + cpu.regs.x;
+    uint8_t value = cpu.read(addr);
+    uint8_t A = cpu.regs.ac;
+    uint8_t result = A - value;
+    cpu.set_zn(result);
+    cpu.set_flag(FLAG_C, A >= value);
+}
+
+void op_DCP_0xDF(CPU6502 &cpu)
+{
+    uint16_t base = cpu.read16();
+    uint16_t addr = base + cpu.regs.x;
+    dcp(cpu, addr);
 }
 
 void op_CPX_0xE0(CPU6502 &cpu) {

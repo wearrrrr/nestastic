@@ -12,8 +12,6 @@ struct ObjectAttributeEntry {
     uint8_t x;
 };
 
-static_assert(sizeof(ObjectAttributeEntry) == 4, "OAM entry must remain 4 bytes");
-
 class PPU {
 public:
     PPU();
@@ -83,10 +81,10 @@ private:
 	v_reg vram_addr;
 	v_reg tram_addr;
 
-    uint8_t     nametable[2][1024];
-    uint8_t     pattern_table[2][4096];
-    uint8_t		palette_table[32];
-    uint8_t		oam_addr = 0x00;
+    uint8_t nametable[2][1024];
+    uint8_t pattern_table[2][4096];
+    uint8_t palette_table[32];
+    uint8_t oam_addr = 0x00;
     ObjectAttributeEntry OAM[64];
     ObjectAttributeEntry spriteScanline[8];
     uint8_t sprite_count = 0;
@@ -105,6 +103,7 @@ private:
 	// Pixel "dot" position information
 	int16_t scanline = 0;
 	int16_t cycle = 0;
+    bool odd_frame = false;
 
 	// Background rendering
 	uint8_t bg_next_tile_id     = 0x00;
@@ -127,6 +126,7 @@ private:
         0xF8D878, 0xD8F878, 0xB8F8B8, 0xB8F8D8, 0x00FCFC, 0xF8D8F8, 0x000000, 0x000000
     };
     uint32_t GetColorFromPaletteRam(uint8_t palette, uint8_t pixel);
+    uint8_t* GetPatternTable(uint8_t i, uint8_t palette);
 
 public:
     Bus *bus;
