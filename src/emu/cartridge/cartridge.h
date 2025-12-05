@@ -5,6 +5,7 @@
 #include <vector>
 #include <cstdint>
 
+typedef class Mapper Mapper;
 typedef class Cartridge Cartridge;
 
 Cartridge* load_cartridge(std::string path);

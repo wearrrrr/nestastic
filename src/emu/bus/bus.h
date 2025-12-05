@@ -1,8 +1,25 @@
 #pragma once
 
-#include "../CPU/6502.h"
 #include "../PPU/ppu.h"
 #include "../cartridge/cartridge.h"
+#include "src/emu/CPU/CPU.h"
+
+struct SaveState {
+    CPURegisters cpu_regs;
+    CPUFlags cpu_flags;
+    PPUSaveState ppu_state;
+    bool cpu_pending_nmi;
+    uint64_t cycles;
+    uint8_t dma_page;
+    uint8_t dma_addr;
+    uint8_t dma_data;
+    bool dma_transfer;
+    bool dma_dummy;
+    uint8_t controller_state[2];
+    uint8_t controller_shift[2];
+    uint8_t controller_strobe;
+    uint8_t ram[0x10000];
+};
 
 class Bus {
 public:
@@ -20,8 +37,8 @@ public:
         BUTTON_RIGHT  = 1 << 7,
     };
 
-    CPU6502 cpu;
-    PPU ppu;
+    CPU cpu = CPU(*this);
+    PPU ppu = PPU(this);
     Cartridge *cart = nullptr;
 
     uint8_t ram[0x10000] = {0};
@@ -29,6 +46,9 @@ public:
     uint8_t read(uint16_t addr);
     void write(uint16_t addr, uint8_t value);
     void clock();
+
+    SaveState save_state() const;
+    void load_state(const SaveState &state);
 
     void set_controller_button(int index, ControllerButton button, bool pressed);
 

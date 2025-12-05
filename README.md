@@ -1,9 +1,9 @@
 # Nestastic
-really bad 6502 emulator
+rather decent NES emulator
 
 # building:
 
-- meson wrap install sdl2
+- ./install_deps.sh
 - meson setup build
 - meson compile -C build
 
@@ -13,10 +13,10 @@ really bad 6502 emulator
 
 # features:
 
-- 30 instructions, some are almost certainly not correct.
-- a probably pretty accurate cycle clocking system
+- Mapper 0 and 2 support
+- (WIP) ImGui-based GUI for debugging and memory viewing.
 
-enjoy! or don't, since it doesn't do really anything useful right now.
+enjoy!
 
 # building examples:
 

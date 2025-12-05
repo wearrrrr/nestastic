@@ -60,16 +60,19 @@
 
 class Mapper_000 : public Mapper
 {
+private:
+    Cartridge *cart;
 public:
-	Mapper_000(uint8_t prgBanks, uint8_t chrBanks);
-	~Mapper_000();
+    Mapper_000(Cartridge *cart, uint8_t prgBanks, uint8_t chrBanks) : Mapper(prgBanks, chrBanks) {
+        this->cart = cart;
+    };
+	~Mapper_000() = default;
 
-public:
-	bool cpuMapRead(uint16_t addr, uint32_t &mapped_addr) override;
-	bool cpuMapWrite(uint16_t addr, uint32_t &mapped_addr, uint8_t data = 0) override;
-	bool ppuMapRead(uint16_t addr, uint32_t &mapped_addr) override;
-	bool ppuMapWrite(uint16_t addr, uint32_t &mapped_addr) override;
+    virtual bool prgRead(uint16_t addr, uint32_t &mapped_addr) override;
+    virtual bool prgWrite(uint16_t addr, uint32_t &mapped_addr, uint8_t data) override;
+
+    virtual bool chrRead(uint16_t addr, uint32_t &mapped_addr) override;
+    virtual bool chrWrite(uint16_t addr, uint32_t &mapped_addr, uint8_t data) override;
 	void reset() override;
 
-	// No local equipment required
 };

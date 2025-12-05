@@ -1,9 +1,8 @@
 #include "bus.h"
+#include <cstring>
 
 Bus::Bus(const char *rom_path) {
   cart = load_cartridge(rom_path);
-  cpu.Connect(this);
-  ppu.connect(this);
 }
 
 Bus::~Bus() { delete cart; }
@@ -103,7 +102,7 @@ void Bus::clock() {
 
   if (ppu.nmi) {
     ppu.nmi = false;
-    cpu.nmi();
+    cpu.pendingNMI = true;
   }
 
   cycles++;
@@ -122,4 +121,45 @@ void Bus::set_controller_button(int index, ControllerButton button, bool pressed
   if (controller_strobe & 0x01) {
     controller_shift[index] = controller_state[index];
   }
+}
+
+SaveState Bus::save_state() const
+{
+  SaveState state{};
+  state.cpu_regs = cpu.get_regs();
+  state.cpu_flags = cpu.get_flags();
+  state.cpu_pending_nmi = cpu.pendingNMI;
+  state.ppu_state = ppu.save_state();
+  std::memcpy(state.ram, ram, sizeof(ram));
+  state.cycles = cycles;
+  state.dma_page = dma_page;
+  state.dma_addr = dma_addr;
+  state.dma_data = dma_data;
+  state.dma_transfer = dma_transfer;
+  state.dma_dummy = dma_dummy;
+  state.controller_state[0] = controller_state[0];
+  state.controller_state[1] = controller_state[1];
+  state.controller_shift[0] = controller_shift[0];
+  state.controller_shift[1] = controller_shift[1];
+  state.controller_strobe = controller_strobe;
+  return state;
+}
+
+void Bus::load_state(const SaveState &state)
+{
+  cpu.load_state(state.cpu_regs, state.cpu_flags);
+  cpu.pendingNMI = state.cpu_pending_nmi;
+  ppu.load_state(state.ppu_state);
+  std::memcpy(ram, state.ram, sizeof(ram));
+  cycles = state.cycles;
+  dma_page = state.dma_page;
+  dma_addr = state.dma_addr;
+  dma_data = state.dma_data;
+  dma_transfer = state.dma_transfer;
+  dma_dummy = state.dma_dummy;
+  controller_state[0] = state.controller_state[0];
+  controller_state[1] = state.controller_state[1];
+  controller_shift[0] = state.controller_shift[0];
+  controller_shift[1] = state.controller_shift[1];
+  controller_strobe = state.controller_strobe;
 }
