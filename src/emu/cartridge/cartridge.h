@@ -10,17 +10,17 @@ typedef class Cartridge Cartridge;
 
 Cartridge* load_cartridge(std::string path);
 
+enum class Mirroring {
+    HORIZONTAL,
+    VERTICAL,
+    FOUR_SCREEN,
+    SINGLE_SCREEN
+};
+
 class Cartridge {
 public:
     std::vector<uint8_t> prg;   // PRG ROM (16k or 32k)
     std::vector<uint8_t> chr;   // CHR ROM/RAM
-
-    enum class Mirroring {
-        HORIZONTAL,
-        VERTICAL,
-        FOUR_SCREEN,
-        SINGLE_SCREEN
-    };
 
     Mirroring mirroring_type;
 

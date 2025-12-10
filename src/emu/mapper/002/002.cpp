@@ -5,7 +5,7 @@ void Mapper_002::reset() {
 	select_prg_hi = nPRGBanks ? nPRGBanks - 1 : 0;
 }
 
-bool Mapper_002::prgRead(uint16_t addr, uint32_t &mapped_addr) {
+bool Mapper_002::prgRead(uint16_t addr, uint32_t &mapped_addr, uint8_t &data) {
     if (addr >= 0x8000 && addr <= 0xBFFF)
 	{
 		mapped_addr = select_prg_lo * 0x4000 + (addr & 0x3FFF);

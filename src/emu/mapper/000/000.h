@@ -68,7 +68,7 @@ public:
     };
 	~Mapper_000() = default;
 
-    virtual bool prgRead(uint16_t addr, uint32_t &mapped_addr) override;
+    virtual bool prgRead(uint16_t addr, uint32_t &mapped_addr, uint8_t &data) override;
     virtual bool prgWrite(uint16_t addr, uint32_t &mapped_addr, uint8_t data) override;
 
     virtual bool chrRead(uint16_t addr, uint32_t &mapped_addr) override;

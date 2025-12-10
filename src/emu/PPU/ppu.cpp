@@ -1,5 +1,6 @@
 #include "ppu.h"
 #include "../bus/bus.h" // IWYU pragma: keep
+#include "../mapper/001/001.h"
 #include <cstring>
 #include <algorithm>
 
@@ -222,7 +223,12 @@ uint8_t PPU::ppuRead(uint16_t addr, bool readonly) {
 	addr &= 0x3FFF;
 
 	Cartridge *cart = bus ? bus->cart : nullptr;
-	Cartridge::Mirroring mirroring = cart ? cart->mirroring_type : Cartridge::Mirroring::HORIZONTAL;
+	Mirroring mirroring = cart ? cart->mirroring_type : Mirroring::HORIZONTAL;
+	int onescreen_bank = 0;
+	if (cart && mirroring == Mirroring::SINGLE_SCREEN && cart->mapper) {
+		int b = cart->mapper->get_onescreen_bank();
+		if (b >= 0) onescreen_bank = b;
+	}
 
 	if (cart && cart->ppuRead(addr, data)) {
 		return data;
@@ -231,7 +237,7 @@ uint8_t PPU::ppuRead(uint16_t addr, bool readonly) {
 	} else if (addr >= 0x2000 && addr <= 0x3EFF) {
 		addr &= 0x0FFF;
 
-		if (mirroring == Cartridge::Mirroring::VERTICAL) {
+		if (mirroring == Mirroring::VERTICAL) {
 			if (addr <= 0x03FF)
 				data = nametable[0][addr & 0x03FF];
 			else if (addr <= 0x07FF)
@@ -240,7 +246,7 @@ uint8_t PPU::ppuRead(uint16_t addr, bool readonly) {
 				data = nametable[0][addr & 0x03FF];
 			else
 				data = nametable[1][addr & 0x03FF];
-		} else {
+		} else if (mirroring == Mirroring::HORIZONTAL) {
 			if (addr <= 0x03FF)
 				data = nametable[0][addr & 0x03FF];
 			else if (addr <= 0x07FF)
@@ -249,6 +255,9 @@ uint8_t PPU::ppuRead(uint16_t addr, bool readonly) {
 				data = nametable[1][addr & 0x03FF];
 			else
 				data = nametable[1][addr & 0x03FF];
+		} else { // SINGLE_SCREEN
+			// All nametable accesses map to the selected onescreen bank
+			data = nametable[onescreen_bank][addr & 0x03FF];
 		}
 	} else if (addr >= 0x3F00 && addr <= 0x3FFF) {
 		addr &= 0x001F;
@@ -266,17 +275,26 @@ void PPU::ppuWrite(uint16_t addr, uint8_t data) {
 	addr &= 0x3FFF;
 
 	Cartridge *cart = bus ? bus->cart : nullptr;
-	Cartridge::Mirroring mirroring = cart ? cart->mirroring_type : Cartridge::Mirroring::HORIZONTAL;
-
-	if (cart && cart->ppuWrite(addr, data)) {
-
+	Mirroring mirroring = cart ? cart->mirroring_type : Mirroring::HORIZONTAL;
+	int onescreen_bank = 0;
+	if (cart && mirroring == Mirroring::SINGLE_SCREEN && cart->mapper) {
+		int b = cart->mapper->get_onescreen_bank();
+		if (b >= 0) onescreen_bank = b;
 	}
-	else if (addr >= 0x0000 && addr <= 0x1FFF) {
+
+	if (!cart) {
+	    printf("PPU::ppuWrite: No cartridge loaded!\n");
+		return;
+	}
+
+	cart->ppuWrite(addr, data);
+
+	if (addr >= 0x0000 && addr <= 0x1FFF) {
 		pattern_table[(addr & 0x1000) >> 12][addr & 0x0FFF] = data;
 	}
 	else if (addr >= 0x2000 && addr <= 0x3EFF) {
 		addr &= 0x0FFF;
-		if (mirroring == Cartridge::Mirroring::VERTICAL) {
+		if (mirroring == Mirroring::VERTICAL) {
 			if (addr <= 0x03FF)
 				nametable[0][addr & 0x03FF] = data;
 			else if (addr <= 0x07FF)
@@ -286,7 +304,7 @@ void PPU::ppuWrite(uint16_t addr, uint8_t data) {
 			else
 				nametable[1][addr & 0x03FF] = data;
 		}
-		else {
+		else if (mirroring == Mirroring::HORIZONTAL) {
 			if (addr <= 0x03FF)
 				nametable[0][addr & 0x03FF] = data;
 			else if (addr <= 0x07FF)
@@ -295,6 +313,9 @@ void PPU::ppuWrite(uint16_t addr, uint8_t data) {
 				nametable[1][addr & 0x03FF] = data;
 			else
 				nametable[1][addr & 0x03FF] = data;
+		}
+		else { // SINGLE_SCREEN
+			nametable[onescreen_bank][addr & 0x03FF] = data;
 		}
 	}
 	else if (addr >= 0x3F00 && addr <= 0x3FFF) {
