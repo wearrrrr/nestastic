@@ -2,7 +2,13 @@
 
 #include "../PPU/ppu.h"
 #include "../cartridge/cartridge.h"
+#include "../APU/apu.h"
 #include "src/emu/CPU/CPU.h"
+
+// Forward declarations for APU and AudioPlayer so the Bus header doesn't need
+// to directly include audio/APU implementation details.
+class AudioPlayer;
+class APU;
 
 struct SaveState {
     CPURegisters cpu_regs;
@@ -40,9 +46,14 @@ public:
     CPU cpu = CPU(*this);
     PPU ppu = PPU(this);
     Cartridge *cart = nullptr;
+    // APU instance managed by the Bus (constructed at runtime)
+    APU *apu = nullptr;
+    // Audio player used by the APU; forward-declared above
+    AudioPlayer *audio_player = nullptr;
 
     uint8_t ram[0x10000] = {0};
 
+    // Read/write/clock entrypoints
     uint8_t read(uint16_t addr);
     void write(uint16_t addr, uint8_t value);
     void clock();
@@ -50,7 +61,19 @@ public:
     SaveState save_state() const;
     void load_state(const SaveState &state);
 
+    // Controller input
     void set_controller_button(int index, ControllerButton button, bool pressed);
+
+    // APU logging: when enabled the Bus will print APU register reads/writes.
+    // This toggle is intentionally part of the Bus so the wiring code in the
+    // .cpp can consult it and emit diagnostic output when APU registers are
+    // accessed. Use setAPULogging(true) to enable.
+    void setAPULogging(bool enable) { apu_logging = enable; }
+    bool getAPULogging() const { return apu_logging; }
+
+private:
+    // Internal flag that controls emitting APU register access logs.
+    bool apu_logging = false;
 
 private:
     uint64_t cycles = 0;

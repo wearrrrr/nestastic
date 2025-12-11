@@ -3,7 +3,10 @@
 #include <cstdint>
 #include <list>
 
+#include "../irq.h"
+
 class Bus;
+class IRQ;
 class CPU;
 
 union CPUFlags {
@@ -27,18 +30,6 @@ struct CPURegisters {
     uint8_t y;
     uint8_t sp;
     uint8_t status;
-};
-
-
-class IRQ {
-    int  bit;
-    CPU &cpu;
-
-public:
-    IRQ(int bit, CPU &cpu) : bit(bit), cpu(cpu) {};
-
-    void release();
-    void pull();
 };
 
 class CPU {

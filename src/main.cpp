@@ -17,7 +17,7 @@ int main(int argc, char *argv[])
     SDL_Event event;
     SDL_Texture* texture = nullptr;
 
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't initialize SDL: %s", SDL_GetError());
         return 3;
     }
@@ -207,6 +207,7 @@ int main(int argc, char *argv[])
             } else {
                 ImGui::Text("Mapper: (unknown)");
             }
+
             ImGui::SeparatorText("Memory Editor");
             static MemoryEditor mem_edit_1;
             mem_edit_1.DrawContents(bus.ram, sizeof(bus.ram));
